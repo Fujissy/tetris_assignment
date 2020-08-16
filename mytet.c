@@ -106,7 +106,11 @@ int main() {
                         case 'a': case 'D': LR(-1); break;
                         case 'e': dLR( 1); break;
                         case 'q': dLR(-1); break;
-                        case 'z': if (holdOK) {hold(); holdOK--;} break;
+                        case 'z': if (holdOK) {
+                            hold();
+                            holdOK--;
+                            lockCount = 0;
+                        } break;
                         case 'x': finish(); break;
                         default: break;
                     }
@@ -557,7 +561,7 @@ void tet(int level, int *levelcount, int *lines) {
     // ren
         ren++;
         if (ren >= 10) printf("\x1b[7;2f\x1b[1m\x1b[7m%dren!\x1b[0m", ren); else
-        if (ren >=  2) printf("\x1b[7;2f\x1b[1m\x1b[7m%dren!!\x1b[0m",ren);
+        if (ren >=  2) printf("\x1b[7;2f\x1b[1m\x1b[7m %dren \x1b[0m",ren);
     } else ren = 0;
     // animation
     if (count) {
