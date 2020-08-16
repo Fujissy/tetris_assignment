@@ -54,10 +54,10 @@ int main() {
     rep(i, Hei+2) rep(j, Wid  ) board[i][j+1] =   0;
     // declaration
     struct timeval start_time, now_time;
-    int level = 1, levelcount = 0, lines = 0;
+    int level = 1, levelcount = 0, lines = 0, lockLimit = 15;
     double thold = 1., duration;
     
-    while (1) { // 固定して1ループ
+    while (1) { // loop of locking mino
 
         int lockCount = 0, holdOK = 1;
         // set
@@ -66,13 +66,14 @@ int main() {
         int boty = 0;
         if (set(mino.type)) {
         // finish
+            prTet();
             printf("\x1b[%d;%df//            \\\\", Hei/2,    Wid +5);
             printf("\x1b[%d;%df   Game Over!   ",   Hei/2 +1, Wid +5);
-            printf("\x1b[%d;%df    %5d pts   ",      Hei/2 +2, Wid +5, score);
+            printf("\x1b[%d;%df    %5d pts   ",     Hei/2 +2, Wid +5, score);
             printf("\x1b[%d;%df\\\\            //", Hei/2 +3, Wid +5);
             break;
         } else if (score >= 99999) {
-            score = 99999;
+            prTet();
             printf("\x1b[%d;%df//            \\\\", Hei/2,    Wid +5);
             printf("\x1b[%d;%df   Game Clear   ",   Hei/2 +1, Wid +5);
             printf("\x1b[%d;%df   99999+ pts   ",   Hei/2 +2, Wid +5);
@@ -82,12 +83,15 @@ int main() {
         // level up
         if (levelcount >= (level +4) *3) {
             levelcount -= (level +4) *3;
-            if (level < 15) level++;
+            if (level < 15) {
+                level++;
+                if (level >= 10) lockLimit--;
+            }
             thold = pow((0.8 -(level-1) *0.007), level -1);
             printf("\x1b[21;1f       %2d", level);
         }
 
-        while (1) { // 時間落下で1ループ
+        while (1) { // loop of fall causing thold
 
             double thold2 = thold;
             if (fly == 2) {
@@ -96,7 +100,8 @@ int main() {
             }
             gettimeofday(&start_time, NULL);
 
-            while (1) { // 入力確認と時間更新
+            while (1) {
+                // check input
                 if (kbhit()) {
                     int c = getch();
                     switch (c) {
@@ -115,8 +120,8 @@ int main() {
                         default: break;
                     }
                     if (fly == 2 && !lockCount) lockCount++;
-                    
-                    if (lockCount && lockCount <=15) {
+                    // lockdown
+                    if (lockCount && lockCount <= lockLimit) {
                         if (mino.block[0][0] > boty) {
                             boty = mino.block[0][0];
                             lockCount = 1;
@@ -139,6 +144,7 @@ int main() {
                         }
                     }
                 }
+                // update time
                 gettimeofday(&now_time, NULL);
                 duration = now_time.tv_sec  -start_time.tv_sec
                          +(now_time.tv_usec -start_time.tv_usec )/1000000.;
@@ -259,7 +265,7 @@ void prGhost() {
         int y = mino.ghost[i][0], x = mino.ghost[i][1];
         if (board[y-1][x]) printf("\x1b[7m");
         printf("\x1b[%d;%df\x1b[%dm", y -1, x*2 +11, 30+mino.type);
-        printf("囗\x1b[0m");
+        if (y >= 3) printf("囗\x1b[0m");
     }
     printf("\n");
 }
