@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <math.h>
 #define rep(i, n) for (int i = 0; i < (int)(n); i++)
-#define Wid 4
+#define Wid 10
 #define Hei 20
 extern int errno;
 struct termios otty, ntty;
