@@ -15,3 +15,6 @@ SRS含む回転、T-Spin（Mini含む）、Back-to-Back、全消し、ゴース�
 
 変えた部分： 
 スコア計算、レベルアップ基準、クリア基準
+
+参考資料：
+https://www.dropbox.com/s/g55gwls0h2muqzn/tetris%20guideline%20docs%202009.zip?dl=0&file_subpath=%2F2009+Tetris+Design+Guideline.pdf
