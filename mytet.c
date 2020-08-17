@@ -526,9 +526,9 @@ void tet(int level, int *levelcount, int *lines) {
     int count2 = count, scoreAdd = 0;
     // display
     if (count) {
+        *levelcount += count*2;
         *lines += count;
         printf("\x1b[18;1f    %5d", *lines);
-        *levelcount += count*2;
     }
     // special clears
     // T-Spin
@@ -542,10 +542,10 @@ void tet(int level, int *levelcount, int *lines) {
             case 2: printf("double"); break;
             case 3: printf("triple"); break;
         }
-        printf("\x1b[0m");
+        printf("\x1b[0m\n");
+        if (sp == 2 || count) BtoB++;
         count += sp;
         sp = 0;
-        if (sp == 2 || count) BtoB++;
     // Tetris
     } else if (count == 4) {
         printf("\x1b[9;2f\x1b[1m\x1b[7m\x1b[36mTETRIS\x1b[0m");
