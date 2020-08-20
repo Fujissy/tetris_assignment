@@ -32,6 +32,7 @@ void down();
 void LR(int n);
 void dLR(int n);
 void tet(int level, int *levelcount, int *lines);
+int black();
 void finish();
 int board[Hei+3][Wid+2] = {{0}};
 int fly = 0, BtoB = 0, score = 0, turn = 0;
@@ -50,39 +51,42 @@ int main() {
     tinit();
     prFrame();
     srand((unsigned)time(NULL));
-    score = 0;
-    // select mode
-    printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
-    printf("\n\x1b[%dG  Select Mode   ",    Wid +5);
-    printf("\n\x1b[%dG                ",    Wid +5);
-    printf("\n\x1b[%dG Normal     : 0 ",    Wid +5);
-    printf("\n\x1b[%dG cha\"REN\"ge : 1 ",  Wid +5);
-    printf("\n\x1b[%dG Block      : 2 ",    Wid +5);
-    printf("\n\x1b[%dG                ",    Wid +5);
-    printf("\n\x1b[%dG\\\\            //",  Wid +5);
-    printf("\n");
-    int mode = -1;
-    while (!('0' <= mode && mode <= '2')) {
-        mode = getch();
+    while (1) {
+        BtoB = score = turn = holded = ren = 0;
+        // select mode
+        printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
+        printf("\n\x1b[%dG  Select Mode   ",    Wid +5);
+        printf("\n\x1b[%dG                ",    Wid +5);
+        printf("\n\x1b[%dG  Normal   : 0  ",    Wid +5);
+        printf("\n\x1b[%dG  chaRENge : 1  ",  Wid +5);
+        printf("\n\x1b[%dG  Block    : 2  ",    Wid +5);
+        printf("\n\x1b[%dG                ",    Wid +5);
+        printf("\n\x1b[%dG\\\\            //",  Wid +5);
+        printf("\n");
+        int mode = -1;
+        while (!('0' <= mode && mode <= '2')) {
+            mode = getch();
+        }
+        game(mode);
+        while (!kbhit()) continue;
+        // play again
+        printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
+        printf("\n\x1b[%dG                ",    Wid +5);
+        printf("\n\x1b[%dG   Play Again?  ",    Wid +5);
+        printf("\n\x1b[%dG                ",    Wid +5);
+        printf("\n\x1b[%dG    YES : 1     ",    Wid +5);
+        printf("\n\x1b[%dG    NO  : 0     ",    Wid +5);
+        printf("\n\x1b[%dG                ",    Wid +5);
+        printf("\n\x1b[%dG\\\\            //",  Wid +5);
+        printf("\n");
+        int again = -1;
+        while (!('0' <= again && again <= '1')) {
+            again = getch();
+        }
+        if (again == '0') break;
+        else continue;
     }
-    game(mode);
-    dsleep(1);
-    // play again
-    printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
-    printf("\n\x1b[%dG                ",    Wid +5);
-    printf("\n\x1b[%dG  Play Again?   ",    Wid +5);
-    printf("\n\x1b[%dG                ",    Wid +5);
-    printf("\n\x1b[%dG    YES : 1     ",    Wid +5);
-    printf("\n\x1b[%dG    NO  : 0     ",    Wid +5);
-    printf("\n\x1b[%dG                ",    Wid +5);
-    printf("\n\x1b[%dG\\\\            //",  Wid +5);
-    printf("\n");
-    int again = -1;
-    while (!('0' <= again && again <= '1')) {
-        again = getch();
-    }
-    if (again == '1') main();
-    else finish();
+    finish();
 }
 
 void game(int mode) {
@@ -138,15 +142,29 @@ void game(int mode) {
             printf("\n\x1b[%dG\\\\            //",  Wid +5);
             printf("\n");
             break;
-        } else if (score >= 99999) {
+        } else if (mode != '2' && score >= 99999) {
+            if (holded) turn--;
             prTet();
             printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
             printf("\n\x1b[%dG   Game Clear   ",    Wid +5);
             printf("\n\x1b[%dG   99999+ pts   ",    Wid +5);
             printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG   Record :     ",    Wid +5);
+            printf("\n\x1b[%dG    %3d lines   ",    Wid +5, lines);
+            printf("\n\x1b[%dG    %3d turns   ",    Wid +5, turn);
+            printf("\n\x1b[%dG\\\\            //",  Wid +5);
+            printf("\n");
+            break;
+        } else if (mode == '\"') {
+            if (holded) turn--;
+            prTet();
+            printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
+            printf("\n\x1b[%dG   Game Clear   ",    Wid +5);
+            printf("\n\x1b[%dG  Black Blocks  ",    Wid +5);
+            printf("\n\x1b[%dG   Eliminated   ",    Wid +5);
             printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG   Record :     ",    Wid +5);
+            printf("\n\x1b[%dG    %3d turns   ",    Wid +5, turn);
             printf("\n\x1b[%dG\\\\            //",  Wid +5);
             printf("\n");
             break;
@@ -182,12 +200,23 @@ void game(int mode) {
                         case 'a': case 'D': LR(-1); break;
                         case 'e': dLR( 1); break;
                         case 'q': dLR(-1); break;
-                        case 'z': if (holdOK) {
-                            hold();
-                            holdOK--;
-                            lockCount = 0;
-                        } break;
-                        case 'x': finish(); break;
+                        case 'z': 
+                            if (holdOK) {
+                                hold();
+                                holdOK--;
+                                lockCount = 0;
+                            } break;
+                        case 'x': 
+                            printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
+                            printf("\n\x1b[%dG                ",    Wid +5);
+                            printf("\n\x1b[%dG                ",    Wid +5);
+                            printf("\n\x1b[%dG   Game Over!   ",    Wid +5);
+                            printf("\n\x1b[%dG    %5d pts     ",    Wid +5, score);
+                            printf("\n\x1b[%dG                ",    Wid +5);
+                            printf("\n\x1b[%dG                ",    Wid +5);
+                            printf("\n\x1b[%dG\\\\            //",  Wid +5);
+                            printf("\n");
+                            return;
                         default: break;
                     }
                     if (fly == 2 && !lockCount) lockCount++;
@@ -229,6 +258,7 @@ void game(int mode) {
             if (!fly) break;
         }
         tet(level, &levelcount, &lines); levelcount++; turn++;
+        if (mode == '2') if (black()) mode = '\"';
     }
 }
 
@@ -680,6 +710,11 @@ void tet(int level, int *levelcount, int *lines) {
         printf("\x1b[15;1f         \n");
         dsleep(0.2);
     }
+}
+
+int black() {
+    rep(i, Hei) rep(j, Wid) if(board[i+2][j+1] == 80) return 0;
+    return 1;
 }
 
 void finish() {
