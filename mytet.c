@@ -13,6 +13,7 @@
 #define Hei 20
 extern int errno;
 struct termios otty, ntty;
+void game(int mode);
 int kbhit();
 int getch();
 void tinit();
@@ -49,9 +50,69 @@ int main() {
     tinit();
     prFrame();
     srand((unsigned)time(NULL));
+    score = 0;
+    // select mode
+    printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
+    printf("\n\x1b[%dG  Select Mode   ",    Wid +5);
+    printf("\n\x1b[%dG                ",    Wid +5);
+    printf("\n\x1b[%dG Normal     : 0 ",    Wid +5);
+    printf("\n\x1b[%dG cha\"REN\"ge : 1 ",  Wid +5);
+    printf("\n\x1b[%dG Block      : 2 ",    Wid +5);
+    printf("\n\x1b[%dG                ",    Wid +5);
+    printf("\n\x1b[%dG\\\\            //",  Wid +5);
+    printf("\n");
+    int mode = -1;
+    while (!('0' <= mode && mode <= '2')) {
+        mode = getch();
+    }
+    game(mode);
+    dsleep(1);
+    // play again
+    printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
+    printf("\n\x1b[%dG                ",    Wid +5);
+    printf("\n\x1b[%dG  Play Again?   ",    Wid +5);
+    printf("\n\x1b[%dG                ",    Wid +5);
+    printf("\n\x1b[%dG    YES : 1     ",    Wid +5);
+    printf("\n\x1b[%dG    NO  : 0     ",    Wid +5);
+    printf("\n\x1b[%dG                ",    Wid +5);
+    printf("\n\x1b[%dG\\\\            //",  Wid +5);
+    printf("\n");
+    int again = -1;
+    while (!('0' <= again && again <= '1')) {
+        again = getch();
+    }
+    if (again == '1') main();
+    else finish();
+}
+
+void game(int mode) {
     // make frame of board
     rep(i, Hei+3) rep(j, Wid+2) board[i][j]   = 100;
-    rep(i, Hei+2) rep(j, Wid  ) board[i][j+1] =   0;
+    int c = Wid/2;
+    switch (mode) {
+        case '0':
+            rep(i, Hei+2) rep(j, Wid  ) board[i][j+1] =   0;
+            break;
+        case '1':
+            rep(i, Hei+2) rep(j, Wid) board[i][j+1  ] = 80;
+            rep(i, Hei+2) rep(j, 4  ) board[i][j+c-1] =  0;
+            board[Hei  ][c-1] = 80;
+            board[Hei+1][c-1] = 80;
+            board[Hei+1][c  ] = 80;
+            break;
+        case '2':
+            rep(i, Hei+2) rep(j, Wid  ) board[i][j+1] =   0;
+            int block = 0;
+            while (block < Hei*Wid/5) {
+                int y = Hei +2 -rand()%(Hei-5);
+                int x = rand()%Wid +1;
+                if (!board[y][x]) {
+                    board[y][x] = 80;
+                    block++;
+                }
+            }
+            break;
+    }
     // declaration
     struct timeval start_time, now_time;
     int level = 1, levelcount = 0, lines = 0, lockLimit = 15;
@@ -67,17 +128,27 @@ int main() {
         if (set(mino.type)) {
         // finish
             prTet();
-            printf("\x1b[%d;%df//            \\\\", Hei/2,    Wid +5);
-            printf("\x1b[%d;%df   Game Over!   ",   Hei/2 +1, Wid +5);
-            printf("\x1b[%d;%df    %5d pts   ",     Hei/2 +2, Wid +5, score);
-            printf("\x1b[%d;%df\\\\            //", Hei/2 +3, Wid +5);
+            printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG   Game Over!   ",    Wid +5);
+            printf("\n\x1b[%dG    %5d pts     ",    Wid +5, score);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG\\\\            //",  Wid +5);
+            printf("\n");
             break;
         } else if (score >= 99999) {
             prTet();
-            printf("\x1b[%d;%df//            \\\\", Hei/2,    Wid +5);
-            printf("\x1b[%d;%df   Game Clear   ",   Hei/2 +1, Wid +5);
-            printf("\x1b[%d;%df   99999+ pts   ",   Hei/2 +2, Wid +5);
-            printf("\x1b[%d;%df\\\\            //", Hei/2 +3, Wid +5);
+            printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG   Game Clear   ",    Wid +5);
+            printf("\n\x1b[%dG   99999+ pts   ",    Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG\\\\            //",  Wid +5);
+            printf("\n");
             break;
         }
         // level up
@@ -159,7 +230,6 @@ int main() {
         }
         tet(level, &levelcount, &lines); levelcount++; turn++;
     }
-    finish();
 }
 
 int kbhit(void){
@@ -221,7 +291,7 @@ void dsleep(double wait) {
 
 void prBlc(int b) {
     if (b >= 10) b /= 10;
-    if (b) printf("\x1b[%dm  ", 40+b);
+    if (b) printf("\x1b[%dm  ", 40+(b%8));
     else printf("\x1b[0m  ");
 }
 
@@ -514,9 +584,9 @@ void tet(int level, int *levelcount, int *lines) {
     // erase 
     printf("\x1b[7;2f      \x1b[9;2f      \n\x1b[2G      \x1b[12;2f      ");
     // check clears
-    int arrs[4] = {0}, count = 0;
+    int arrs[20] = {0}, count = 0;
     rep(i, Hei){
-        int check = 1;
+        long check = 1;
         rep(j, Wid) check *= board[i+2][j+1];
         if (check != 0) {
             arrs[count] = i;
