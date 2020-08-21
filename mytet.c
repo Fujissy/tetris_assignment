@@ -33,10 +33,12 @@ void LR(int n);
 void dLR(int n);
 void tet(int level, int *levelcount, int *lines);
 int black();
+int blackCount();
+void prFinish(int n);
 void finish();
 int board[Hei+3][Wid+2] = {{0}};
-int fly = 0, BtoB = 0, score = 0, turn = 0;
-int next[14], holded = 0, ren = 0, sp = 0;
+int BtoB, score, turn, holded, ren, renM, lines;
+int next[14],fly = 0, sp = 0, mode;
 typedef struct Mino {
     int type, dir;
     int block[4][2];
@@ -49,27 +51,29 @@ Mino mino;
 int main() {
     // start
     tinit();
-    prFrame();
     srand((unsigned)time(NULL));
     while (1) {
-        BtoB = score = turn = holded = ren = 0;
+        BtoB= score= turn= holded= ren= renM= lines= 0;
+        prFrame();
+        prMino(holded, 4, 1);
         // select mode
         printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
         printf("\n\x1b[%dG  Select Mode   ",    Wid +5);
         printf("\n\x1b[%dG                ",    Wid +5);
         printf("\n\x1b[%dG  Normal   : 0  ",    Wid +5);
-        printf("\n\x1b[%dG  chaRENge : 1  ",  Wid +5);
+        printf("\n\x1b[%dG  chaRENge : 1  ",    Wid +5);
         printf("\n\x1b[%dG  Block    : 2  ",    Wid +5);
         printf("\n\x1b[%dG                ",    Wid +5);
         printf("\n\x1b[%dG\\\\            //",  Wid +5);
         printf("\n");
-        int mode = -1;
+        mode = -1;
         while (!('0' <= mode && mode <= '2')) {
             mode = getch();
         }
+        prFrame();
         game(mode);
-        while (!kbhit()) continue;
         // play again
+        while (!kbhit()) continue;
         printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
         printf("\n\x1b[%dG                ",    Wid +5);
         printf("\n\x1b[%dG   Play Again?  ",    Wid +5);
@@ -119,7 +123,7 @@ void game(int mode) {
     }
     // declaration
     struct timeval start_time, now_time;
-    int level = 1, levelcount = 0, lines = 0, lockLimit = 15;
+    int level = 1, levelcount = 0, lockLimit = 15;
     double thold = 1., duration;
     
     while (1) { // loop of locking mino
@@ -129,46 +133,19 @@ void game(int mode) {
         mino.type = mkNext();
         mino.dir = 0;
         int boty = 0;
-        if (set(mino.type)) {
         // finish
-            prTet();
-            printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG   Game Over!   ",    Wid +5);
-            printf("\n\x1b[%dG    %5d pts     ",    Wid +5, score);
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG\\\\            //",  Wid +5);
-            printf("\n");
-            break;
-        } else if (mode != '2' && score >= 99999) {
-            if (holded) turn--;
-            prTet();
-            printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
-            printf("\n\x1b[%dG   Game Clear   ",    Wid +5);
-            printf("\n\x1b[%dG   99999+ pts   ",    Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG   Record :     ",    Wid +5);
-            printf("\n\x1b[%dG    %3d lines   ",    Wid +5, lines);
-            printf("\n\x1b[%dG    %3d turns   ",    Wid +5, turn);
-            printf("\n\x1b[%dG\\\\            //",  Wid +5);
-            printf("\n");
-            break;
-        } else if (mode == '\"') {
-            if (holded) turn--;
-            prTet();
-            printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
-            printf("\n\x1b[%dG   Game Clear   ",    Wid +5);
-            printf("\n\x1b[%dG  Black Blocks  ",    Wid +5);
-            printf("\n\x1b[%dG   Eliminated   ",    Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG   Record :     ",    Wid +5);
-            printf("\n\x1b[%dG    %3d turns   ",    Wid +5, turn);
-            printf("\n\x1b[%dG\\\\            //",  Wid +5);
-            printf("\n");
+        if (set(mino.type)) {
+            prFinish(0);
             break;
         }
+        if (mode != '2' && score >= 99999) {
+            prFinish(1);
+            break;
+            }
+        if (mode == '\"') {
+            prFinish(2); 
+            break;
+            }
         // level up
         if (levelcount >= (level +4) *3) {
             levelcount -= (level +4) *3;
@@ -206,17 +183,7 @@ void game(int mode) {
                                 holdOK--;
                                 lockCount = 0;
                             } break;
-                        case 'x': 
-                            printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
-                            printf("\n\x1b[%dG                ",    Wid +5);
-                            printf("\n\x1b[%dG                ",    Wid +5);
-                            printf("\n\x1b[%dG   Game Over!   ",    Wid +5);
-                            printf("\n\x1b[%dG    %5d pts     ",    Wid +5, score);
-                            printf("\n\x1b[%dG                ",    Wid +5);
-                            printf("\n\x1b[%dG                ",    Wid +5);
-                            printf("\n\x1b[%dG\\\\            //",  Wid +5);
-                            printf("\n");
-                            return;
+                        case 'x': prFinish(0); return;
                         default: break;
                     }
                     if (fly == 2 && !lockCount) lockCount++;
@@ -328,6 +295,7 @@ void prBlc(int b) {
 void prMino(int kind, int y, int x) {
     printf("\x1b[%d;%df", y, x);
     switch (kind) {
+        case 0: prBlc(0); prBlc(0); prBlc(0); prBlc(0); break;
         case 1: prBlc(1); prBlc(1); prBlc(0); prBlc(0); break;
         case 2: prBlc(0); prBlc(2); prBlc(2); prBlc(0); break;
         case 3: prBlc(0); prBlc(3); prBlc(3); prBlc(0); break;
@@ -339,13 +307,14 @@ void prMino(int kind, int y, int x) {
     }
     printf("\x1b[%d;%df", y+1, x);
     switch (kind) {
-        case 1: prBlc(0); prBlc(1); prBlc(1); break;
-        case 2: prBlc(2); prBlc(2); prBlc(0); break;
-        case 3: prBlc(0); prBlc(3); prBlc(3); break;
-        case 4: prBlc(4); prBlc(4); prBlc(4); break;
-        case 5: prBlc(5); prBlc(5); prBlc(5); break;
-        case 6: prBlc(0); prBlc(0); prBlc(0); break;
-        case 7: prBlc(7); prBlc(7); prBlc(7); break;
+        case 0: prBlc(0); prBlc(0); prBlc(0); prBlc(0); break;
+        case 1: prBlc(0); prBlc(1); prBlc(1); prBlc(0); break;
+        case 2: prBlc(2); prBlc(2); prBlc(0); prBlc(0); break;
+        case 3: prBlc(0); prBlc(3); prBlc(3); prBlc(0); break;
+        case 4: prBlc(4); prBlc(4); prBlc(4); prBlc(0); break;
+        case 5: prBlc(5); prBlc(5); prBlc(5); prBlc(0); break;
+        case 6: prBlc(0); prBlc(0); prBlc(0); prBlc(0); break;
+        case 7: prBlc(7); prBlc(7); prBlc(7); prBlc(0); break;
         default: break;
     }
     printf("\x1b[0m");
@@ -371,6 +340,16 @@ void prGhost() {
 }
 
 void prFrame() {
+    printf("\x1b[0m\x1b[7;2f      \x1b[9;2f      \n\x1b[2G      \x1b[12;2f      ");
+    printf("\x1b[2;9f");
+    rep (i, Hei) {
+        printf("  ＊");
+        rep(j, Wid) printf("  ");
+        printf("＊  \n\x1b[9G");
+    }
+    printf("  ");
+    rep(i, Wid+2) printf("＊");
+    printf("  ");
     printf("\x1b[2;3fHOLD");
     printf("\x1b[2;%dfNEXT", 2*Wid +19);
     printf("\x1b[14;1fSCORE :");
@@ -379,13 +358,6 @@ void prFrame() {
     printf("\n\x1b[G        0");
     printf("\x1b[20;1fLEVEL :");
     printf("\n\x1b[G        1");
-    printf("\x1b[2;11f");
-    rep (i, Hei) {
-        printf("＊");
-        rep(j, Wid) printf("  ");
-        printf("＊\n\x1b[11G");
-    }
-    rep(i, Wid+2) printf("＊");
     printf("\n");
 }
 
@@ -612,7 +584,7 @@ void dLR(int n) {
 
 void tet(int level, int *levelcount, int *lines) {
     // erase 
-    printf("\x1b[7;2f      \x1b[9;2f      \n\x1b[2G      \x1b[12;2f      ");
+    printf("\x1b[0m\x1b[7;2f      \x1b[9;2f      \n\x1b[2G      \x1b[12;2f      ");
     // check clears
     int arrs[20] = {0}, count = 0;
     rep(i, Hei){
@@ -668,6 +640,7 @@ void tet(int level, int *levelcount, int *lines) {
         ren++;
         if (ren >= 10) printf("\x1b[7;2f\x1b[1m\x1b[7m%dren!\x1b[0m", ren); else
         if (ren >=  2) printf("\x1b[7;2f\x1b[1m\x1b[7m %dren \x1b[0m",ren);
+        if (ren > renM) renM = ren;
     } else ren = 0;
     // animation
     if (count) {
@@ -715,6 +688,63 @@ void tet(int level, int *levelcount, int *lines) {
 int black() {
     rep(i, Hei) rep(j, Wid) if(board[i+2][j+1] == 80) return 0;
     return 1;
+}
+
+int blackCount() {
+    int count = 0;
+    rep(i, Hei) rep(j, Wid) if(board[i+2][j+1] == 80) count++;
+    return count;
+}
+
+void prFinish(int n) {
+    prTet();
+    printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
+    switch (n) {
+        case 0:
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG   Game Over!   ",    Wid +5);
+            switch (mode) {
+                case '0':
+                    printf("\n\x1b[%dG    %5d pts   ", Wid +5, score);
+                    break;
+                case '1':
+                    printf("\n\x1b[%dG   MAX %2d ren   ", Wid +5, renM);
+                    break;
+                case '2':
+                    printf("\n\x1b[%dG      %2d left   ", Wid +5, blackCount());
+                    break;    
+            }
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            break;
+        case 1:
+            if (holded) turn--;
+            printf("\n\x1b[%dG   Game Clear   ",    Wid +5);
+            printf("\n\x1b[%dG   99999+ pts   ",    Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG   Record :     ",    Wid +5);
+            switch (mode) {
+                case '0':
+                    printf("\n\x1b[%dG    %3d lines   ",    Wid +5, lines);
+                    break;
+                case '1':
+                    printf("\n\x1b[%dG   MAX %2d ren   ", Wid +5, renM);
+                    break;
+            }
+            printf("\n\x1b[%dG    %3d turns   ",    Wid +5, turn);
+            break;
+        case 2:
+            if (holded) turn--;
+            printf("\n\x1b[%dG   Game Clear   ",    Wid +5);
+            printf("\n\x1b[%dG  Black Blocks  ",    Wid +5);
+            printf("\n\x1b[%dG   Eliminated   ",    Wid +5);
+            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG   Record :     ",    Wid +5);
+            printf("\n\x1b[%dG    %3d turns   ",    Wid +5, turn);
+            break;
+    }
+    printf("\n\x1b[%dG\\\\            //\n",  Wid +5);
 }
 
 void finish() {
