@@ -41,8 +41,7 @@ int BtoB, score, turn, holded, ren, renM, lines;
 int next[14],fly = 0, sp = 0, mode;
 typedef struct Mino {
     int type, dir;
-    int block[4][2];
-    int ghost[4][2];
+    int block[4][2], ghost[4][2];
     // [0]:core, [1~3]:else
     // [][0]:y, [][1]:x
 } Mino;
@@ -62,17 +61,16 @@ int main() {
         printf("\n\x1b[%dG                ",    Wid +5);
         printf("\n\x1b[%dG  Normal   : 0  ",    Wid +5);
         printf("\n\x1b[%dG  chaRENge : 1  ",    Wid +5);
-        printf("\n\x1b[%dG  Block    : 2  ",    Wid +5);
-        printf("\n\x1b[%dG                ",    Wid +5);
+        printf("\n\x1b[%dG  Bl@ck    : 2  ",    Wid +5);
+        printf("\n\x1b[%dG  Battle   : 3  ",    Wid +5);
         printf("\n\x1b[%dG\\\\            //",  Wid +5);
         printf("\n");
         mode = -1;
-        while (!('0' <= mode && mode <= '2')) {
-            mode = getch();
-        }
+        while (!('0' <= mode && mode <= '2')) mode = getch();
         prFrame();
         game(mode);
         // play again
+        dsleep(1);
         while (!kbhit()) continue;
         printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
         printf("\n\x1b[%dG                ",    Wid +5);
@@ -84,9 +82,7 @@ int main() {
         printf("\n\x1b[%dG\\\\            //",  Wid +5);
         printf("\n");
         int again = -1;
-        while (!('0' <= again && again <= '1')) {
-            again = getch();
-        }
+        while (!('0' <= again && again <= '1')) again = getch();
         if (again == '0') break;
         else continue;
     }
@@ -633,9 +629,8 @@ void tet(int level, int *levelcount, int *lines) {
         }
     // add score
         scoreAdd = Wid *5 *(count *(count+1) +ren*2) *(1. +(level-1)*level/20.);
-        if (scoreAdd) {
-            score += scoreAdd;
-        }
+        if (mode == '1') scoreAdd *= 4./Wid;
+        if (scoreAdd) score += scoreAdd;
     // ren
         ren++;
         if (ren >= 10) printf("\x1b[7;2f\x1b[1m\x1b[7m%dren!\x1b[0m", ren); else
@@ -657,8 +652,9 @@ void tet(int level, int *levelcount, int *lines) {
         }
         rep(i, count2){
             rep(j, Wid) {
-                for(int k = arrs[i]; k > 0; k--)
-                board[k+2][j+1] = board[k+1][j+1];
+                for(int k = arrs[i] +2; k > 0; k--)
+                board[k][j+1] = board[k-1][j+1];
+                if (mode != '1') board[0][j+1] = 0;
             }
             dsleep(0.1); prTet();
             if (scoreAdd) printf("\x1b[15;1f   +%5d", scoreAdd);
@@ -701,9 +697,9 @@ void prFinish(int n) {
     printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
     switch (n) {
         case 0:
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG   Game Over!   ",    Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
+            printf("\n\x1b[%dG   Game Over!   ", Wid +5);
             switch (mode) {
                 case '0':
                     printf("\n\x1b[%dG    %5d pts   ", Wid +5, score);
@@ -715,36 +711,36 @@ void prFinish(int n) {
                     printf("\n\x1b[%dG      %2d left   ", Wid +5, blackCount());
                     break;    
             }
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
             break;
         case 1:
             if (holded) turn--;
-            printf("\n\x1b[%dG   Game Clear   ",    Wid +5);
-            printf("\n\x1b[%dG   99999+ pts   ",    Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG   Record :     ",    Wid +5);
+            printf("\n\x1b[%dG   Game Clear   ", Wid +5);
+            printf("\n\x1b[%dG   99999+ pts   ", Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
+            printf("\n\x1b[%dG   Record :     ", Wid +5);
+            printf("\n\x1b[%dG    %3d turns   ", Wid +5, turn);
             switch (mode) {
                 case '0':
-                    printf("\n\x1b[%dG    %3d lines   ",    Wid +5, lines);
+                    printf("\n\x1b[%dG    %3d lines   ", Wid +5, lines);
                     break;
                 case '1':
                     printf("\n\x1b[%dG   MAX %2d ren   ", Wid +5, renM);
                     break;
             }
-            printf("\n\x1b[%dG    %3d turns   ",    Wid +5, turn);
             break;
         case 2:
             if (holded) turn--;
-            printf("\n\x1b[%dG   Game Clear   ",    Wid +5);
-            printf("\n\x1b[%dG  Black Blocks  ",    Wid +5);
-            printf("\n\x1b[%dG   Eliminated   ",    Wid +5);
-            printf("\n\x1b[%dG                ",    Wid +5);
-            printf("\n\x1b[%dG   Record :     ",    Wid +5);
-            printf("\n\x1b[%dG    %3d turns   ",    Wid +5, turn);
+            printf("\n\x1b[%dG   Game Clear   ", Wid +5);
+            printf("\n\x1b[%dG   All Bl@cks   ", Wid +5);
+            printf("\n\x1b[%dG   Eliminated   ", Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
+            printf("\n\x1b[%dG   Record :     ", Wid +5);
+            printf("\n\x1b[%dG    %3d turns   ", Wid +5, turn);
             break;
     }
-    printf("\n\x1b[%dG\\\\            //\n",  Wid +5);
+    printf("\n\x1b[%dG\\\\            //\n", Wid +5);
 }
 
 void finish() {
