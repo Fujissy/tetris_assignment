@@ -11,19 +11,19 @@
 #define rep(i, n) for (int i = 0; i < (int)(n); i++)
 #define Wid 10
 #define Hei 20
+#define Buf 20
 extern int errno;
 struct termios otty, ntty;
-void game(int mode);
+void game();
 int kbhit();
 int getch();
 void tinit();
 void dsleep(double wait);
 void prBlc(int b);
 void prMino(int kind, int y, int x);
-void prTet();
-void prGhost();
+void prTet(int n);
 void prFrame();
-void setGhost();
+void ghost(int n);
 int mkNext();
 int set(int m);
 void ctrl(int n);
@@ -31,13 +31,12 @@ void hold();
 void down();
 void LR(int n);
 void dLR(int n);
-void tet(int level, int *levelcount, int *lines);
-int black();
+void tet(int level, int *levelcount, int *BtoB, int *ren);
 int blackCount();
-void prFinish(int n);
+void prInf(int n);
 void finish();
-int board[Hei+3][Wid+2] = {{0}};
-int BtoB, score, turn, holded, ren, renM, lines;
+int board[Hei+Buf+1][Wid+2] = {{0}};
+int score, turn, holded, lines, renM;
 int next[14],fly = 0, sp = 0, mode;
 typedef struct Mino {
     int type, dir;
@@ -46,42 +45,39 @@ typedef struct Mino {
     // [][0]:y, [][1]:x
 } Mino;
 Mino mino;
+typedef struct Enemy {
+    char symbol[3];
+    int HP, AtCount;
+} Enemy;
 
 int main() {
     // start
     tinit();
     srand((unsigned)time(NULL));
     while (1) {
-        BtoB= score= turn= holded= ren= renM= lines= 0;
+        score= turn= holded= lines= renM= 0;
         prFrame();
         prMino(holded, 4, 1);
         // select mode
-        printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
-        printf("\n\x1b[%dG  Select Mode   ",    Wid +5);
-        printf("\n\x1b[%dG                ",    Wid +5);
-        printf("\n\x1b[%dG  Normal   : 0  ",    Wid +5);
-        printf("\n\x1b[%dG  chaRENge : 1  ",    Wid +5);
-        printf("\n\x1b[%dG  Bl@ck    : 2  ",    Wid +5);
-        printf("\n\x1b[%dG  Battle   : 3  ",    Wid +5);
-        printf("\n\x1b[%dG\\\\            //",  Wid +5);
-        printf("\n");
+        prInf(0);
         mode = -1;
-        while (!('0' <= mode && mode <= '2')) mode = getch();
+        while (!('0' <= mode && mode <= '3')) mode = getch();
         prFrame();
         game(mode);
         // play again
-        dsleep(1);
-        while (!kbhit()) continue;
-        printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
-        printf("\n\x1b[%dG                ",    Wid +5);
-        printf("\n\x1b[%dG   Play Again?  ",    Wid +5);
-        printf("\n\x1b[%dG                ",    Wid +5);
-        printf("\n\x1b[%dG    YES : 1     ",    Wid +5);
-        printf("\n\x1b[%dG    NO  : 0     ",    Wid +5);
-        printf("\n\x1b[%dG                ",    Wid +5);
-        printf("\n\x1b[%dG\\\\            //",  Wid +5);
-        printf("\n");
         int again = -1;
+        struct timeval start_time, now_time;
+        gettimeofday(&start_time, NULL);
+        while (1) {
+            if (kbhit()) again = getch();
+            gettimeofday(&now_time, NULL);
+            double duration = now_time.tv_sec  -start_time.tv_sec
+                            +(now_time.tv_usec -start_time.tv_usec )/1000000.;
+            if (duration > 1) break;
+        }
+        while (!kbhit()) continue;
+        prInf(20);
+        again = -1;
         while (!('0' <= again && again <= '1')) again = getch();
         if (again == '0') break;
         else continue;
@@ -89,37 +85,36 @@ int main() {
     finish();
 }
 
-void game(int mode) {
+void game() {
     // make frame of board
-    rep(i, Hei+3) rep(j, Wid+2) board[i][j]   = 100;
+    rep(i, Hei+Buf+1) rep(j, Wid+2) board[i][j]   = 100;
+    rep(i, Hei+Buf  ) rep(j, Wid  ) board[i][j+1] =   0;
     int c = Wid/2;
     switch (mode) {
         case '0':
-            rep(i, Hei+2) rep(j, Wid  ) board[i][j+1] =   0;
+        case '3':
             break;
         case '1':
-            rep(i, Hei+2) rep(j, Wid) board[i][j+1  ] = 80;
-            rep(i, Hei+2) rep(j, 4  ) board[i][j+c-1] =  0;
-            board[Hei  ][c-1] = 80;
-            board[Hei+1][c-1] = 80;
-            board[Hei+1][c  ] = 80;
+            rep(i, Hei+Buf) rep(j, Wid) board[i][j+1  ] = 80;
+            rep(i, Hei+Buf) rep(j, 4  ) board[i][j+c-1] =  0;
+            board[Hei+Buf-2][c-1] = 80;
+            board[Hei+Buf-1][c-1] = 80;
+            board[Hei+Buf-1][c  ] = 80;
             break;
         case '2':
-            rep(i, Hei+2) rep(j, Wid  ) board[i][j+1] =   0;
-            int block = 0;
-            while (block < Hei*Wid/5) {
-                int y = Hei +2 -rand()%(Hei-5);
+            rep(i, Hei*Wid/5){
+                int y = Hei+Buf-1 -rand()%(Hei-5);
                 int x = rand()%Wid +1;
-                if (!board[y][x]) {
-                    board[y][x] = 80;
-                    block++;
-                }
+                if (board[y][x]) i--;
+                else board[y][x] = 80;
             }
+            blackCount(1);
             break;
     }
+    prTet(0);
     // declaration
     struct timeval start_time, now_time;
-    int level = 1, levelcount = 0, lockLimit = 15;
+    int level = 1, levelcount = 0, BtoB = 0, ren = 0, lockLimit = 15;
     double thold = 1., duration;
     
     while (1) { // loop of locking mino
@@ -131,24 +126,22 @@ void game(int mode) {
         int boty = 0;
         // finish
         if (set(mino.type)) {
-            prFinish(0);
+            prInf(10);
             break;
         }
         if (mode != '2' && score >= 99999) {
-            prFinish(1);
+            prInf(11);
             break;
-            }
+        }
         if (mode == '\"') {
-            prFinish(2); 
+            prInf(12); 
             break;
-            }
+        }
         // level up
         if (levelcount >= (level +4) *3) {
             levelcount -= (level +4) *3;
-            if (level < 15) {
-                level++;
-                if (level >= 10) lockLimit--;
-            }
+            if (level < 15) level++;
+            if (level >= 10) lockLimit--;
             thold = pow((0.8 -(level-1) *0.007), level -1);
             printf("\x1b[21;1f       %2d", level);
         }
@@ -179,7 +172,16 @@ void game(int mode) {
                                 holdOK--;
                                 lockCount = 0;
                             } break;
-                        case 'x': prFinish(0); return;
+                        case 'p': 
+                            prInf(5);
+                            while (!kbhit()) continue;
+                            gettimeofday(&now_time, NULL);
+                            thold2 = now_time.tv_sec  -start_time.tv_sec
+                                   +(now_time.tv_usec -start_time.tv_usec) /1000000.
+                                   + thold + 0.5;
+                            prTet(0);
+                            break;
+                        case 27: prInf(10); return;
                         default: break;
                     }
                     if (fly == 2 && !lockCount) lockCount++;
@@ -193,7 +195,7 @@ void game(int mode) {
                         gettimeofday(&now_time, NULL);
                         thold2 = now_time.tv_sec  -start_time.tv_sec
                                +(now_time.tv_usec -start_time.tv_usec) /1000000.
-                               + 0.5;
+                               + 5./(25-lockLimit);
                     }
                     if (fly == 2) {
                         int filled = 0;
@@ -220,8 +222,8 @@ void game(int mode) {
             }
             if (!fly) break;
         }
-        tet(level, &levelcount, &lines); levelcount++; turn++;
-        if (mode == '2') if (black()) mode = '\"';
+        tet(level, &levelcount, &BtoB, &ren); levelcount++; turn++;
+        if (mode == '2') if (!blackCount(1)) mode = '\"';
     }
 }
 
@@ -316,23 +318,18 @@ void prMino(int kind, int y, int x) {
     printf("\x1b[0m");
 }
 
-void prTet() {
-    printf("\x1b[2;13f");
-    rep(i, Hei){
-        rep(j, Wid) prBlc(board[i+2][j+1]);
-        printf("\x1b[0m\n\x1b[13G");
+void prTet(int n) {
+    if (n) {
+        printf("\x1b[%d;13f", n+1);
+        rep(i, Wid) prBlc(board[n+Buf][i+1]);
+        printf("\x1b[0m\n");
+    } else {
+        printf("\x1b[2;13f");
+        rep(i, Hei){
+            rep(j, Wid) prBlc(board[i+Buf][j+1]);
+            printf("\x1b[0m\n\x1b[13G");
+        }
     }
-    printf("\x1b[0m\x1b[15;1f   %6d", score);
-}
-
-void prGhost() {
-    rep(i, 4){
-        int y = mino.ghost[i][0], x = mino.ghost[i][1];
-        if (board[y-1][x]) printf("\x1b[7m");
-        printf("\x1b[%d;%df\x1b[%dm", y -1, x*2 +11, 30+mino.type);
-        if (y >= 3) printf("囗\x1b[0m");
-    }
-    printf("\n");
 }
 
 void prFrame() {
@@ -348,7 +345,8 @@ void prFrame() {
     printf("  ");
     printf("\x1b[2;3fHOLD");
     printf("\x1b[2;%dfNEXT", 2*Wid +19);
-    printf("\x1b[14;1fSCORE :");
+    if (mode == '2') printf("\x1b[14;1fLEFT : ");
+    else printf("\x1b[14;1fSCORE :");
     printf("\n\x1b[G        0");
     printf("\x1b[17;1fLINES :");
     printf("\n\x1b[G        0");
@@ -357,19 +355,43 @@ void prFrame() {
     printf("\n");
 }
 
-void setGhost() {
-    int d = 0, f = 1;
-    while (1) {
+void ghost(int n) {
+    // 0 : set+print
+    // 1 : clear+set+print
+    // 2 : print
+    // 3 : clear
+    if (n % 2) {
         rep(i, 4){
-            int y = mino.block[i][0], x = mino.block[i][1];
-            if (board[y+d][x] /10) {f--; break;}
+            printf("\x1b[0m");
+            int y = mino.ghost[i][0], x = mino.ghost[i][1];
+            printf("\x1b[%d;%df", y -Buf +1, x*2 +11);
+            if ((y >= Buf+1) && !board[y-1][x]) printf("  ");
         }
-        if (f) d++;
-        else break;
     }
-    rep(i, 4) {
-        mino.ghost[i][0] = mino.block[i][0] +d;
-        mino.ghost[i][1] = mino.block[i][1];
+    if (n < 2) {
+        int d = 0, f = 1;
+        while (1) {
+            rep(i, 4){
+                int y = mino.block[i][0], x = mino.block[i][1];
+                if (board[y+d][x] /10) {f--; break;}
+            }
+            if (f) d++;
+            else break;
+        }
+        rep(i, 4){
+            mino.ghost[i][0] = mino.block[i][0] +d;
+            mino.ghost[i][1] = mino.block[i][1];
+        }
+    }
+    if (n < 3) {
+        rep(i, 4){
+            printf("\x1b[0m");
+            int y = mino.ghost[i][0], x = mino.ghost[i][1];
+            if (board[y-1][x]) printf("\x1b[7m");
+            printf("\x1b[%d;%df\x1b[%dm", y -Buf +1, x*2 +11, 30+mino.type);
+            if (y >= Buf +1) printf("囗");
+        }
+        printf("\x1b[0m\n");
     }
 }
 
@@ -391,7 +413,7 @@ int mkNext() {
     }
     int ret = next[0];
     rep(i, 13) next[i] = next[i+1];
-    rep(i,  6) prMino(next[i], 3*i +4, 2*Wid +17);
+    rep(i, (Hei-1)/3) prMino(next[i], 3*i +4, 2*Wid +17);
     return ret;
 }
 
@@ -399,60 +421,58 @@ int set(int m) {
     int c = Wid/2;
     switch (m) {
     case 1: // Z
-        if (board[1][c-1] + board[1][c] + board[2][c] + board[2][c+1]) return 1;
-        mino.block[1][0] = 1; mino.block[1][1] = c-1;
-        mino.block[2][0] = 1; mino.block[2][1] = c;
-        mino.block[0][0] = 2; mino.block[0][1] = c;
-        mino.block[3][0] = 2; mino.block[3][1] = c+1;
+        if (board[Buf-1][c-1] + board[Buf-1][c] + board[Buf][c] + board[Buf][c+1]) return 1;
+        mino.block[1][0] = Buf-1; mino.block[1][1] = c-1;
+        mino.block[2][0] = Buf-1; mino.block[2][1] = c;
+        mino.block[0][0] = Buf;   mino.block[0][1] = c;
+        mino.block[3][0] = Buf;   mino.block[3][1] = c+1;
         break;
     case 2: // S
-        if (board[1][c] + board[1][c+1] + board[2][c-1] + board[2][c]) return 1;
-        mino.block[1][0] = 1; mino.block[1][1] = c;
-        mino.block[2][0] = 1; mino.block[2][1] = c+1;
-        mino.block[3][0] = 2; mino.block[3][1] = c-1;
-        mino.block[0][0] = 2; mino.block[0][1] = c;
+        if (board[Buf-1][c] + board[Buf-1][c+1] + board[Buf][c-1] + board[Buf][c]) return 1;
+        mino.block[1][0] = Buf-1; mino.block[1][1] = c;
+        mino.block[2][0] = Buf-1; mino.block[2][1] = c+1;
+        mino.block[3][0] = Buf;   mino.block[3][1] = c-1;
+        mino.block[0][0] = Buf;   mino.block[0][1] = c;
         break;
     case 3: // O
-        if (board[1][c] + board[1][c+1] + board[2][c] + board[2][c+1]) return 1;
-        mino.block[1][0] = 1; mino.block[1][1] = c;
-        mino.block[2][0] = 1; mino.block[2][1] = c+1;
-        mino.block[0][0] = 2; mino.block[0][1] = c;
-        mino.block[3][0] = 2; mino.block[3][1] = c+1;
+        if (board[Buf-1][c] + board[Buf-1][c+1] + board[Buf][c] + board[Buf][c+1]) return 1;
+        mino.block[1][0] = Buf-1; mino.block[1][1] = c;
+        mino.block[2][0] = Buf-1; mino.block[2][1] = c+1;
+        mino.block[0][0] = Buf;   mino.block[0][1] = c;
+        mino.block[3][0] = Buf;   mino.block[3][1] = c+1;
         break;
     case 4: // J
-        if (board[1][c-1] + board[2][c-1] + board[2][c] + board[2][c+1]) return 1;
-        mino.block[1][0] = 1; mino.block[1][1] = c-1;
-        mino.block[2][0] = 2; mino.block[2][1] = c-1;
-        mino.block[0][0] = 2; mino.block[0][1] = c;
-        mino.block[3][0] = 2; mino.block[3][1] = c+1;
+        if (board[Buf-1][c-1] + board[Buf][c-1] + board[Buf][c] + board[Buf][c+1]) return 1;
+        mino.block[1][0] = Buf-1; mino.block[1][1] = c-1;
+        mino.block[2][0] = Buf;   mino.block[2][1] = c-1;
+        mino.block[0][0] = Buf;   mino.block[0][1] = c;
+        mino.block[3][0] = Buf;   mino.block[3][1] = c+1;
         break;
     case 5: // T
-        if (board[1][c] + board[2][c-1] + board[2][c] + board[2][c+1]) return 1;
-        mino.block[1][0] = 1; mino.block[1][1] = c;
-        mino.block[2][0] = 2; mino.block[2][1] = c-1;
-        mino.block[0][0] = 2; mino.block[0][1] = c;
-        mino.block[3][0] = 2; mino.block[3][1] = c+1;
+        if (board[1][c] + board[Buf][c-1] + board[Buf][c] + board[Buf][c+1]) return 1;
+        mino.block[1][0] = Buf-1; mino.block[1][1] = c;
+        mino.block[2][0] = Buf;   mino.block[2][1] = c-1;
+        mino.block[0][0] = Buf;   mino.block[0][1] = c;
+        mino.block[3][0] = Buf;   mino.block[3][1] = c+1;
         break;
     case 6: // I
-        if (board[2][c] + board[2][c-1] + board[2][c] + board[2][c+1]) return 1;
-        mino.block[1][0] = 2; mino.block[1][1] = c-1;
-        mino.block[0][0] = 2; mino.block[0][1] = c;
-        mino.block[2][0] = 2; mino.block[2][1] = c+1;
-        mino.block[3][0] = 2; mino.block[3][1] = c+2;
+        if (board[Buf-1][c] + board[Buf-1][c-1] + board[Buf-1][c] + board[Buf-1][c+1]) return 1;
+        mino.block[1][0] = Buf-1; mino.block[1][1] = c-1;
+        mino.block[0][0] = Buf-1; mino.block[0][1] = c;
+        mino.block[2][0] = Buf-1; mino.block[2][1] = c+1;
+        mino.block[3][0] = Buf-1; mino.block[3][1] = c+2;
         break;
     case 7: // L
-        if (board[1][c-1] + board[2][c] + board[2][c+1] + board[2][c+2]) return 1;
-        mino.block[1][0] = 1; mino.block[1][1] = c+1;
-        mino.block[2][0] = 2; mino.block[2][1] = c-1;
-        mino.block[0][0] = 2; mino.block[0][1] = c;
-        mino.block[3][0] = 2; mino.block[3][1] = c+1;
+        if (board[Buf-1][c-1] + board[Buf][c] + board[Buf][c+1] + board[Buf][c+2]) return 1;
+        mino.block[1][0] = Buf-1; mino.block[1][1] = c+1;
+        mino.block[2][0] = Buf;   mino.block[2][1] = c-1;
+        mino.block[0][0] = Buf;   mino.block[0][1] = c;
+        mino.block[3][0] = Buf;   mino.block[3][1] = c+1;
         break;
     }
     fly = 1;
+    ghost(0);
     ctrl(1);
-    prTet();
-    setGhost();
-    prGhost();
     return 0;
 }
 
@@ -460,6 +480,11 @@ void ctrl(int n) {
     rep(i, 4){
         int y = mino.block[i][0], x = mino.block[i][1];
         board[y][x] = mino.type *n;
+        if (y >= Buf) {
+            printf("\x1b[%d;%df\x1b", y -Buf +2, x*2 +11);
+            prBlc(board[y][x]);
+            printf("\x1b[0m\n");
+        }
     }
 }
 
@@ -471,19 +496,22 @@ void hold() {
         mino.type = mkNext();
     }
     prMino(holded, 4, 1);
+    ghost(3);
     set(mino.type);
 }
 
 void down(int s) {
+    ctrl(0);
     if (fly == 2) {ctrl(10); fly = 0; return;}
     rep(i, 4){
         int y = mino.block[i][0], x = mino.block[i][1];
-        if (board[y+1][x] /10) {fly = 2; return;} 
+        if (board[y+1][x] /10) {ctrl(1); ghost(2); fly = 2; return;} 
     }
-    ctrl(0); rep(i, 4) mino.block[i][0]++; ctrl(1);
+    rep(i, 4) mino.block[i][0]++;
+    ctrl(1);
+    ghost(2);
     score += s;
-    prTet();
-    prGhost();
+    if (mode != '2') printf("\x1b[0m\x1b[15;1f   %6d", score);
 }
 
 void LR(int n) {
@@ -491,10 +519,10 @@ void LR(int n) {
         int y = mino.block[i][0], x = mino.block[i][1];
         if (board[y][x+n] /10) return;
     }
-    ctrl(0); rep(i, 4) mino.block[i][1] += n; ctrl(1);
-    prTet();
-    setGhost();
-    prGhost();
+    ctrl(0); 
+    rep(i, 4) mino.block[i][1] += n;
+    ctrl(1);
+    ghost(1);
 }
 
 void dLR(int n) {
@@ -558,9 +586,7 @@ void dLR(int n) {
         else spin = 0;
     }
     ctrl(1);
-    prTet();
-    setGhost();
-    prGhost();
+    ghost(1);
     if (spin) {
         mino.dir += n;
         if (mino.dir == -1) mino.dir = 3;
@@ -578,14 +604,14 @@ void dLR(int n) {
     }
 }
 
-void tet(int level, int *levelcount, int *lines) {
+void tet(int level, int *levelcount, int *BtoB, int *ren) {
     // erase 
     printf("\x1b[0m\x1b[7;2f      \x1b[9;2f      \n\x1b[2G      \x1b[12;2f      ");
     // check clears
     int arrs[20] = {0}, count = 0;
     rep(i, Hei){
         long check = 1;
-        rep(j, Wid) check *= board[i+2][j+1];
+        rep(j, Wid) check *= board[i+Buf][j+1];
         if (check != 0) {
             arrs[count] = i;
             count++;
@@ -595,8 +621,8 @@ void tet(int level, int *levelcount, int *lines) {
     // display
     if (count) {
         *levelcount += count*2;
-        *lines += count;
-        printf("\x1b[18;1f    %5d", *lines);
+        lines += count;
+        printf("\x1b[18;1f    %5d", lines);
     }
     // special clears
     // T-Spin
@@ -605,64 +631,73 @@ void tet(int level, int *levelcount, int *lines) {
         if (sp == 2) printf("T-Spin\n\x1b[2G");
         if (sp == 1) printf("Mini-T\n\x1b[2G");
         switch (count) {
-            case 0: ren = 0; break;
+            case 0: *ren = 0; break;
             case 1: printf("single"); break;
             case 2: printf("double"); break;
             case 3: printf("triple"); break;
         }
         printf("\x1b[0m\n");
-        if (sp == 2 || count) BtoB++;
+        if (sp == 2 || count) *BtoB += 1;
         count += sp;
         sp = 0;
     // Tetris
     } else if (count == 4) {
         printf("\x1b[9;2f\x1b[1m\x1b[7m\x1b[36mTETRIS\x1b[0m");
-        BtoB++;
-    } else if (count) BtoB = 0;
+        *BtoB += 1;
+    } else if (count) *BtoB = 0;
     // Back to Back
     if (count) {
-        if (BtoB >= 2) {
+        if (*BtoB >= 2) {
             printf("\x1b[12;2f\x1b[1m\x1b[7m");
             printf("\x1b[31m \x1b[33mB\x1b[32mt\x1b[36mo\x1b[34mB\x1b[35m ");
             printf("\x1b[0m");
             count++;
         }
     // add score
-        scoreAdd = Wid *5 *(count *(count+1) +ren*2) *(1. +(level-1)*level/20.);
+        if (mode != '2') scoreAdd = Wid *5 *(count *(count+1) +*ren*2) *(1. +(level-1)*level/20.);
         if (mode == '1') scoreAdd *= 4./Wid;
-        if (scoreAdd) score += scoreAdd;
+        if (scoreAdd) {
+            score += scoreAdd;
+            printf("\x1b[15;1f   +%5d", scoreAdd);
+        }
     // ren
-        ren++;
-        if (ren >= 10) printf("\x1b[7;2f\x1b[1m\x1b[7m%dren!\x1b[0m", ren); else
-        if (ren >=  2) printf("\x1b[7;2f\x1b[1m\x1b[7m %dren \x1b[0m",ren);
-        if (ren > renM) renM = ren;
-    } else ren = 0;
+        *ren += 1;
+        if (*ren >= 10) printf("\x1b[7;2f\x1b[1m\x1b[7m%dren!\x1b[0m", *ren); else
+        if (*ren >=  2) printf("\x1b[7;2f\x1b[1m\x1b[7m %dren \x1b[0m",*ren);
+        if (*ren > renM) renM = *ren;
+    } else *ren = 0;
     // animation
     if (count) {
         rep(i, Wid){
-            rep(j, count2) board[arrs[j]+2][i+1] = mino.type;
-            dsleep(0.1/Wid); prTet();
-            if (scoreAdd) printf("\x1b[15;1f   +%5d", scoreAdd);
+            rep(j, count2) {
+                board[arrs[j]+Buf][i+1] = mino.type;
+                printf("\x1b[%d;%df\x1b", arrs[j] +2, i*2 +13);
+                prBlc(mino.type);
+            }
+            printf("\x1b[0m\n");
+            dsleep(0.15 / (Wid+level));
         }
-        dsleep(0.1);
+        dsleep(1.5 / (Wid+level));
         rep(i, Wid){
-            rep(j, count2) board[arrs[j]+2][i+1] = 0;
-            dsleep(0.1/Wid); prTet();
-            if (scoreAdd) printf("\x1b[15;1f   +%5d", scoreAdd);
+            rep(j, count2) {
+                board[arrs[j]+Buf][i+1] = 0;
+                printf("\x1b[%d;%df\x1b", arrs[j] +2, i*2 +13);
+                prBlc(0);
+            }
+            printf("\x1b[0m\n");
+            dsleep(0.15 / (Wid+level));
         }
         rep(i, count2){
             rep(j, Wid) {
-                for(int k = arrs[i] +2; k > 0; k--)
+                for(int k = arrs[i] +Buf; k > 0; k--)
                 board[k][j+1] = board[k-1][j+1];
                 if (mode != '1') board[0][j+1] = 0;
             }
-            dsleep(0.1); prTet();
-            if (scoreAdd) printf("\x1b[15;1f   +%5d", scoreAdd);
+            dsleep(1.5 / (Wid+level)); prTet(0);
         }
     }
     // all clear
-    count = 0;
-    rep(i, Hei) rep(j, Wid) if(board[i+2][j+1]) return;
+    rep(i, Hei) if(board[Hei+Buf-1][i+1]) return;
     scoreAdd = (1000+(level-1)*level*50) *Wid;
     score += scoreAdd;
     *levelcount += (level +4) *3;
@@ -681,56 +716,55 @@ void tet(int level, int *levelcount, int *lines) {
     }
 }
 
-int black() {
-    rep(i, Hei) rep(j, Wid) if(board[i+2][j+1] == 80) return 0;
-    return 1;
-}
-
-int blackCount() {
+int blackCount(int print) {
     int count = 0;
-    rep(i, Hei) rep(j, Wid) if(board[i+2][j+1] == 80) count++;
+    rep(i, Hei) rep(j, Wid) if(board[i+Buf][j+1] == 80) count++;
+    if (print) printf("\x1b[0m\x1b[15;1f      %3d", count);
     return count;
 }
 
-void prFinish(int n) {
-    prTet();
+void prInf(int n) {
+    prTet(0);
     printf("\x1b[%d;%df//            \\\\", Hei/2 -2, Wid +5);
     switch (n) {
         case 0:
+            printf("\n\x1b[%dG  Select Mode   ", Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
+            printf("\n\x1b[%dG  Normal   : 0  ", Wid +5);
+            printf("\n\x1b[%dG  chaRENge : 1  ", Wid +5);
+            printf("\n\x1b[%dG  Bl@ck    : 2  ", Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
+            // printf("\n\x1b[%dG  Battle   : 3  ", Wid +5);
+            break;
+        case 5:
+            printf("\n\x1b[%dG                ", Wid +5);
+            printf("\n\x1b[%dG     PAUSE      ", Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
+            printf("\n\x1b[%dG    Any Key     ", Wid +5);
+            printf("\n\x1b[%dG   to Resume    ", Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
+            break;
+        case 10:
             printf("\n\x1b[%dG                ", Wid +5);
             printf("\n\x1b[%dG                ", Wid +5);
             printf("\n\x1b[%dG   Game Over!   ", Wid +5);
-            switch (mode) {
-                case '0':
-                    printf("\n\x1b[%dG    %5d pts   ", Wid +5, score);
-                    break;
-                case '1':
-                    printf("\n\x1b[%dG   MAX %2d ren   ", Wid +5, renM);
-                    break;
-                case '2':
-                    printf("\n\x1b[%dG      %2d left   ", Wid +5, blackCount());
-                    break;    
-            }
+                 if (mode == '0') printf("\n\x1b[%dG    %5d pts   ",    Wid +5, score);
+            else if (mode == '1') printf("\n\x1b[%dG   MAX %2d ren   ", Wid +5, renM);
+            else if (mode == '2') printf("\n\x1b[%dG      %2d left   ", Wid +5, blackCount(0));
             printf("\n\x1b[%dG                ", Wid +5);
             printf("\n\x1b[%dG                ", Wid +5);
             break;
-        case 1:
+        case 11:
             if (holded) turn--;
             printf("\n\x1b[%dG   Game Clear   ", Wid +5);
             printf("\n\x1b[%dG   99999+ pts   ", Wid +5);
             printf("\n\x1b[%dG                ", Wid +5);
             printf("\n\x1b[%dG   Record :     ", Wid +5);
             printf("\n\x1b[%dG    %3d turns   ", Wid +5, turn);
-            switch (mode) {
-                case '0':
-                    printf("\n\x1b[%dG    %3d lines   ", Wid +5, lines);
-                    break;
-                case '1':
-                    printf("\n\x1b[%dG   MAX %2d ren   ", Wid +5, renM);
-                    break;
-            }
+                 if (mode == '0') printf("\n\x1b[%dG    %3d lines   ",  Wid +5, lines);
+            else if (mode == '1') printf("\n\x1b[%dG   MAX %2d ren   ", Wid +5, renM);
             break;
-        case 2:
+        case 12:
             if (holded) turn--;
             printf("\n\x1b[%dG   Game Clear   ", Wid +5);
             printf("\n\x1b[%dG   All Bl@cks   ", Wid +5);
@@ -738,6 +772,14 @@ void prFinish(int n) {
             printf("\n\x1b[%dG                ", Wid +5);
             printf("\n\x1b[%dG   Record :     ", Wid +5);
             printf("\n\x1b[%dG    %3d turns   ", Wid +5, turn);
+            break;
+        case 20:
+            printf("\n\x1b[%dG                ", Wid +5);
+            printf("\n\x1b[%dG   Play Again?  ", Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
+            printf("\n\x1b[%dG    YES : 1     ", Wid +5);
+            printf("\n\x1b[%dG    NO  : 0     ", Wid +5);
+            printf("\n\x1b[%dG                ", Wid +5);
             break;
     }
     printf("\n\x1b[%dG\\\\            //\n", Wid +5);
